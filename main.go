@@ -10,10 +10,24 @@ import (
 	"strings"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
-
 func main() {
+	input, numWorkers := sanitizeInputs()
+
+	crawler := crawl.NewCrawler(input, publish.NewConsolePublisher())
+	var err error
+	if numWorkers == 1 {
+		err = crawler.Crawl()
+	} else {
+		err = crawler.CrawlParallel(numWorkers) // use the optional argument here
+	}
+	if err != nil {
+		fmt.Println("Spider had issues spidering")
+		fmt.Printf("[Error]: %v\n", err)
+		return
+	}
+}
+
+func sanitizeInputs() (string, int) {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: spider <base_website_link> [num_workers::optional]")
 		os.Exit(1)
@@ -43,19 +57,7 @@ func main() {
 		}
 		numWorkers = n
 	}
-
-	crawler := crawl.NewCrawler(input, publish.NewConsolePublisher())
-	var err error
-	if numWorkers == 1 {
-		err = crawler.Crawl()
-	} else {
-		err = crawler.CrawlParallel(numWorkers) // use the optional argument here
-	}
-	if err != nil {
-		fmt.Println("Spider had issues spidering")
-		fmt.Printf("[Error]: %v\n", err)
-		return
-	}
+	return input, numWorkers
 }
 
 func IsValidHTTPLink(link string) bool {

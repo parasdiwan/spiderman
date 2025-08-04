@@ -3,7 +3,7 @@ package crawl
 import (
 	"fmt"
 	"log"
-	filters2 "spiderman/crawl/filters"
+	"spiderman/crawl/filters"
 	"strings"
 	"sync"
 
@@ -14,7 +14,7 @@ import (
 type Crawler struct {
 	parser    *links.Parser
 	publisher publish.Publisher
-	filters   []filters2.Filter
+	filters   []filters.Filter
 	baseUrl   string
 }
 
@@ -22,13 +22,13 @@ func NewCrawler(baseUrl string, publisher publish.Publisher) *Crawler {
 	return &Crawler{
 		parser:    links.NewParser(),
 		publisher: publisher,
-		filters: []filters2.Filter{
-			&filters2.NotEmpty{},
-			filters2.NewInternalLink(baseUrl),
-			&filters2.NotFragment{},
-			&filters2.NotMailLink{},
-			&filters2.NotTelephone{},
-			&filters2.NotFile{},
+		filters: []filters.Filter{
+			&filters.NotEmpty{},
+			filters.NewInternalLink(baseUrl),
+			&filters.NotFragment{},
+			&filters.NotMailLink{},
+			&filters.NotTelephone{},
+			&filters.NotFile{},
 		},
 		baseUrl: baseUrl,
 	}
@@ -44,8 +44,8 @@ func (m *Crawler) isCrawlable(link string) bool {
 }
 
 func (m *Crawler) buildAbsolutePath(link string) string {
-	internalLink := filters2.SanitizeLink(link)
-	baseDomain := filters2.SanitizeLink(m.baseUrl)
+	internalLink := filters.SanitizeLink(link)
+	baseDomain := filters.SanitizeLink(m.baseUrl)
 	// taking default as http
 	protocol := "http://"
 	if strings.Contains(m.baseUrl, "://") && strings.HasPrefix(m.baseUrl, "https://") {
@@ -77,6 +77,7 @@ func (m *Crawler) Crawl() error {
 func (m *Crawler) crawlAndPublishLinks(nextUrl string, queue *FifoQueue) {
 	linksForPage, err := m.parser.FetchLinks(nextUrl)
 	if err != nil {
+		_ = m.publisher.RecordError(nextUrl, resolveErrType(err), err)
 		log.Printf("[Error] failed to crawl page: %s\n", err)
 		return
 	}
@@ -126,6 +127,7 @@ func (c *Crawler) processURL(workerID int, url string, queue *TaskQueue, wg *syn
 	linksForPage, err := c.parser.FetchLinks(url)
 	if err != nil {
 		log.Printf("[Worker %d] Error fetching %s: %v", workerID, url, err)
+		_ = c.publisher.RecordError(url, resolveErrType(err), err)
 		return
 	}
 	_ = c.publisher.Publish(url, linksForPage)
@@ -139,4 +141,19 @@ func (c *Crawler) processURL(workerID int, url string, queue *TaskQueue, wg *syn
 			wg.Add(1)
 		}
 	}
+}
+
+func resolveErrType(err error) publish.ErrType {
+	switch err.Error() {
+	case "failed with status 500":
+		return publish.ErrTypeInternal
+	case "failed with status 404":
+		return publish.ErrTypeNotFound
+	case "failed with status 403":
+		return publish.ErrTypeNoAccess
+	default:
+		fmt.Println("-------------------ERROR FOUND------------------------------")
+		fmt.Println(err.Error())
+	}
+	return publish.ErrTypeUnknown
 }
