@@ -149,3 +149,6 @@ If I had more time, I would have done the following:
   - Add a limit to the number of urls to be crawled so we don't run into memory issues.
 - **Place limits when websites end-up being too big**: Add a limit to the amount of urls to be crawled so we don't run into memory issues.
 - Parser can be improved to become more generic.
+
+  ## Contributing
+  - This project is still a work in progress. @parasdiwan is the only maintainer atm. Feel free to reach out if you wanna add anything
